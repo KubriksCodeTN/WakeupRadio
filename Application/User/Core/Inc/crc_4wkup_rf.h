@@ -30,7 +30,7 @@ extern "C" {
 #include <stdint.h>
 
 #define CRC_POLYNOM         0x8005
-#define PAYLOAD_LEN              7
+#define LPAWUR_PAYLOAD_LEN              7
 
 /**
 * @brief  function reflecting bits of 16-bit word                 

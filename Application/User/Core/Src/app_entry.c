@@ -39,7 +39,7 @@
 /* Private defines -----------------------------------------------------------*/
 
 /* USER CODE BEGIN PD */
-#define PAYLOAD_LEN 7
+#define LPAWUR_PAYLOAD_LEN 7
 /* USER CODE END PD */
 
 /* Private macros ------------------------------------------------------------*/
@@ -52,7 +52,7 @@
 
 /* USER CODE BEGIN PV */
 #define PACKET_LEN 15
-uint8_t LPAWUR_Payload[PAYLOAD_LEN];
+uint8_t LPAWUR_Payload[LPAWUR_PAYLOAD_LEN];
 static uint8_t payload_memory[PACKET_LEN] = { 0 };
 
 static uint8_t vectcTxBuff[PACKET_LEN];

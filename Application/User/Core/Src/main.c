@@ -36,8 +36,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define PAYLOAD_LEN 7
-#define MSG_LEN 15
+#define LPAWUR_PAYLOAD_LEN 7
+#define LPAWUR_FRAME_LEN 15
 
 /* USER CODE END PD */
 
@@ -57,74 +57,7 @@ void SystemClock_Config(void);
 void PeriphCommonClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_LPAWUR_Init(void);
-static void MX_MRSUBG_Init(void) {
-
-	SMRSubGConfig MRSUBG_RadioInitStruct;
-	MRSubG_PcktBasicFields MRSUBG_PacketSettingsStruct;
-
-	/* USER CODE BEGIN MRSUBG_Init 0 */
-
-	/* USER CODE END MRSUBG_Init 0 */
-
-	/* USER CODE BEGIN MRSUBG_Init 1 */
-
-	/* USER CODE END MRSUBG_Init 1 */
-
-	MRSUBG_RadioInitStruct.lFrequencyBase = 868000000;
-	MRSUBG_RadioInitStruct.xModulationSelect = MOD_OOK;
-	MRSUBG_RadioInitStruct.lDatarate = 2000;
-	MRSUBG_RadioInitStruct.lFreqDev = 20000;
-	MRSUBG_RadioInitStruct.lBandwidth = 50000;
-	MRSUBG_RadioInitStruct.dsssExp = 0;
-	MRSUBG_RadioInitStruct.outputPower = 14;
-	MRSUBG_RadioInitStruct.PADrvMode = PA_DRV_TX_HP;
-	HAL_MRSubG_Init(&MRSUBG_RadioInitStruct);
-
-	MRSUBG_PacketSettingsStruct.PreambleLength = 0;
-	MRSUBG_PacketSettingsStruct.PostambleLength = 0;
-	MRSUBG_PacketSettingsStruct.SyncLength = 0;
-	MRSUBG_PacketSettingsStruct.SyncWord = 0x88888888;
-	MRSUBG_PacketSettingsStruct.FixVarLength = FIXED;
-	MRSUBG_PacketSettingsStruct.PreambleSequence = PRE_SEQ_0101;
-	MRSUBG_PacketSettingsStruct.PostambleSequence = POST_SEQ_0101;
-	MRSUBG_PacketSettingsStruct.CrcMode = PKT_NO_CRC;
-	MRSUBG_PacketSettingsStruct.Coding = CODING_MANCHESTER;
-	MRSUBG_PacketSettingsStruct.DataWhitening = DISABLE;
-	MRSUBG_PacketSettingsStruct.LengthWidth = BYTE_LEN_1;
-	MRSUBG_PacketSettingsStruct.SyncPresent = DISABLE;
-	HAL_MRSubG_PacketBasicInit(&MRSUBG_PacketSettingsStruct);
-
-	/*
-	 MRSUBG_RadioInitStruct.lFrequencyBase = 868000000;
-	 MRSUBG_RadioInitStruct.xModulationSelect = MOD_2FSK;
-	 MRSUBG_RadioInitStruct.lDatarate = 38400;
-	 MRSUBG_RadioInitStruct.lFreqDev = 20000;
-	 MRSUBG_RadioInitStruct.lBandwidth = 100000;
-	 MRSUBG_RadioInitStruct.dsssExp = 0;
-	 MRSUBG_RadioInitStruct.outputPower = 14;
-	 MRSUBG_RadioInitStruct.PADrvMode = PA_DRV_TX_HP;
-
-
-	 MRSUBG_PacketSettingsStruct.PreambleLength = 16;
-	 MRSUBG_PacketSettingsStruct.PostambleLength = 0;
-	 MRSUBG_PacketSettingsStruct.SyncLength = 31;
-	 MRSUBG_PacketSettingsStruct.SyncWord = 0x88888888;
-	 MRSUBG_PacketSettingsStruct.FixVarLength = FIXED;
-	 MRSUBG_PacketSettingsStruct.PreambleSequence = PRE_SEQ_0101;
-	 MRSUBG_PacketSettingsStruct.PostambleSequence = POST_SEQ_0101;
-	 MRSUBG_PacketSettingsStruct.CrcMode = PKT_CRC_MODE_8BITS;
-	 MRSUBG_PacketSettingsStruct.Coding = CODING_NONE;
-	 MRSUBG_PacketSettingsStruct.DataWhitening = ENABLE;
-	 MRSUBG_PacketSettingsStruct.LengthWidth = BYTE_LEN_1;
-	 MRSUBG_PacketSettingsStruct.SyncPresent = ENABLE;
-	 */
-	mrsubg_init(&MRSUBG_RadioInitStruct, &MRSUBG_PacketSettingsStruct);
-	/* USER CODE BEGIN MRSUBG_Init 2 */
-
-	/* USER CODE END MRSUBG_Init 2 */
-
-}
-
+static void MX_MRSUBG_Init(void);
 static void utils_init(void) {
 	COM_InitTypeDef COM_Init = { 0 };
 
@@ -139,6 +72,7 @@ static void utils_init(void) {
 	BSP_LED_Init(LD2);
 
 	BSP_PB_Init(B1, GPIO_MODE);
+	BSP_PB_Init(B2, GPIO_MODE);
 
 	/* Low Power Manager Init */
 	UTIL_LPM_Init();
@@ -206,61 +140,99 @@ static void CreateLPAWURFrame(uint8_t *data) {
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-int main_subg_tx(void) {
-	/* USER CODE BEGIN 1 */
+void task_subg_tx(void) {
 
-	/* USER CODE END 1 */
-
-	/* MCU Configuration--------------------------------------------------------*/
-
-	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-	HAL_Init();
-
-	/* USER CODE BEGIN Init */
-
-	/* USER CODE END Init */
-
-	/* Configure the system clock */
-	SystemClock_Config();
-
-	/* Configure the peripherals common clocks */
-	PeriphCommonClock_Config();
-
-	/* USER CODE BEGIN SysInit */
-
-	/* USER CODE END SysInit */
-
-	/* Initialize all configured peripherals */
-	MX_GPIO_Init();
 	MX_MRSUBG_Init();
 	utils_init();
 
-	/* USER CODE BEGIN 2 */
-
-	/* USER CODE END 2 */
 	printf("MRSUBG - TX example.\r\n");
-	/* Infinite loop */
-	/* USER CODE BEGIN WHILE */
-	uint8_t data[MSG_LEN] = { 0 };
-	CreateLPAWURFrame(data);
+
+	uint8_t lpawur_frame[LPAWUR_FRAME_LEN] = { 0 };
+	CreateLPAWURFrame(lpawur_frame);
 
 	while (1) {
 
-		printf("Transmitting: [ ");
-		for (uint8_t i = 0; i < MSG_LEN; i++) {
-			printf("%x ", data[i]);
-		}
-		printf(" ]\r\n");
+		HAL_PWR_EnableWakeUpPin(LL_PWR_WAKEUP_PORTA, PWR_WAKEUP_PIN11,
+		PWR_WUP_FALLEDG);
+		HAL_PWR_EnableWakeUpPin(LL_PWR_WAKEUP_PORTA, PWR_WAKEUP_PIN0,
+		PWR_WUP_FALLEDG);
 
-		mrsubg_tx(data, MSG_LEN);
+		uint32_t wakeupPin = HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTA);
+
+		if (wakeupPin & B2_PIN) {
+			BSP_LED_On(LD2);
+
+			printf("Transmitting to LPAWUR: [ ");
+			for (uint8_t i = 0; i < LPAWUR_FRAME_LEN; i++) {
+				printf("0x%02x ", lpawur_frame[i]);
+			}
+			printf("]\r\n");
+
+			mrsubg_tx(lpawur_frame, LPAWUR_FRAME_LEN);
+			BSP_LED_Off(LD2);
+		}
+
+		else if (wakeupPin & B1_PIN) {
+			printf("Flash?\r\n");
+			while (4)
+				;
+		}
 
 		enter_low_power(POWER_SAVE_LEVEL_DEEPSTOP_TIMER);
-
-		/* USER CODE END WHILE */
-
-		/* USER CODE BEGIN 3 */
 	}
-	/* USER CODE END 3 */
+}
+
+void task_lpawur_rx(void) {
+
+	MX_LPAWUR_Init();
+	//MX_MRSUBG_Init();
+	utils_init();
+
+	printf("LPAWUR - Receiver example.\r\n");
+
+	uint8_t lpawur_data[LPAWUR_PAYLOAD_LEN] = { 100, 101, 102, 103, 104, 105,
+			106 };
+
+	while (1) {
+		printf("WAKE UP\r\n");
+
+		/* Wakeup source configuration */
+		HAL_PWREx_EnableInternalWakeUpLine(PWR_WAKEUP_LPAWUR, PWR_WUP_RISIEDG);
+		HAL_PWR_EnableWakeUpPin(LL_PWR_WAKEUP_PORTA, PWR_WAKEUP_PIN0,
+		PWR_WUP_FALLEDG);
+
+		uint32_t wakeupSource = HAL_PWREx_GetClearInternalWakeUpLine();
+
+		/* Wakeup on LPAWUR Frame Valid */
+
+		if (wakeupSource & PWR_WAKEUP_LPAWUR) {
+			lpawur_disable();
+			BSP_LED_On(LD2);
+			LPAWUR_Status status = lpawur_recv(lpawur_data, LPAWUR_PAYLOAD_LEN);
+			printf("LPAWUR status: 0x%02x\r\n", status);
+
+			if (status != NO_STATUS) {
+
+				printf("LPAWUR data received: [ ");
+				for (uint8_t i = 0; i < LPAWUR_PAYLOAD_LEN; i++) {
+					printf("0x%02x ", lpawur_data[i]);
+				}
+				printf("]\r\n");
+
+			}
+			BSP_LED_Off(LD2);
+			lpawur_enable();
+		}
+
+		wakeupSource = HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTA);
+		if (wakeupSource & B1_PIN) {
+			printf("GPIO wakeup for flashing\r\n");
+			while (4)
+				;
+		}
+		lpawur_enable();
+		enter_low_power(POWER_SAVE_LEVEL_DEEPSTOP_TIMER);
+	}
 }
 
 /* USER CODE END 0 */
@@ -294,68 +266,9 @@ int main(void) {
 
 	/* Initialize all configured peripherals */
 	MX_GPIO_Init();
-	MX_LPAWUR_Init();
-	//MX_MRSUBG_Init();
 
-	utils_init();
-
-	/* USER CODE BEGIN APPE_Init_2 */
-
-	printf("LPAWUR - Receiver example.\r\n");
-
-	/* USER CODE BEGIN 2 */
-
-	uint8_t lpawur_data[PAYLOAD_LEN] = { 100, 101, 102, 103, 104, 105, 106 };
-
-	/* USER CODE END 2 */
-
-	/* Infinite loop */
-	/* USER CODE BEGIN WHILE */
-	while (1) {
-		printf("WAKE UP\r\n");
-
-		/* Wakeup source configuration */
-		HAL_PWREx_EnableInternalWakeUpLine(PWR_WAKEUP_LPAWUR, PWR_WUP_RISIEDG);
-		HAL_PWR_EnableWakeUpPin(LL_PWR_WAKEUP_PORTA, PWR_WAKEUP_PIN0,
-		PWR_WUP_FALLEDG);
-
-		uint32_t wakeupSource = HAL_PWREx_GetClearInternalWakeUpLine();
-
-		/* Wakeup on LPAWUR Frame Valid */
-
-		if (wakeupSource & PWR_WAKEUP_LPAWUR) {
-			lpawur_disable();
-			BSP_LED_On(LD2);
-			LPAWUR_Status status = lpawur_recv(lpawur_data, PAYLOAD_LEN);
-			printf("LPAWUR status: 0x%02x\r\n", status);
-
-			if (status != NO_STATUS) {
-
-				printf("LPAWUR data received: [ ");
-				for (uint8_t i = 0; i < PAYLOAD_LEN; i++) {
-					printf("0x%02x ", lpawur_data[i]);
-				}
-				printf("]\r\n");
-
-			}
-			BSP_LED_Off(LD2);
-			lpawur_enable();
-		}
-
-		wakeupSource = HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTA);
-		if (wakeupSource & B1_PIN) {
-			printf("GPIO wakeup for flashing\r\n");
-			while (4)
-				;
-		}
-		lpawur_enable();
-		enter_low_power(POWER_SAVE_LEVEL_DEEPSTOP_TIMER);
-
-		/* USER CODE END WHILE */
-
-		/* USER CODE BEGIN 3 */
-	}
-	/* USER CODE END 3 */
+	// task_lpawur_rx();
+	task_subg_tx();
 }
 
 /**
@@ -412,17 +325,6 @@ void PeriphCommonClock_Config(void) {
  */
 static void MX_LPAWUR_Init(void) {
 
-	/* USER CODE BEGIN LPAWUR_Init 0 */
-
-	/* USER CODE END LPAWUR_Init 0 */
-
-	/* USER CODE BEGIN LPAWUR_Init 1 */
-
-	/* USER CODE END LPAWUR_Init 1 */
-
-	/** Configures the radio parameters
-	 */
-
 	SLPAWUR_RFConfig LPAWUR_RadioInitStruct = LPAWUR_DEFAULT_CFG()
 	;
 	SLPAWUR_FrameInit LPAWUR_FrameInitStruct = LPAWUR_DEFAULT_FRAME_CFG()
@@ -431,9 +333,18 @@ static void MX_LPAWUR_Init(void) {
 	lpawur_init(&LPAWUR_RadioInitStruct);
 	lpawur_frame_init(&LPAWUR_FrameInitStruct);
 
-	/* USER CODE BEGIN LPAWUR_Init 2 */
+}
 
-	/* USER CODE END LPAWUR_Init 2 */
+static void MX_MRSUBG_Init(void) {
+
+	SMRSubGConfig MRSUBG_RadioInitStruct = MRSUBG_DEFAULT_LPAWUR_CFG()
+	;
+	MRSubG_PcktBasicFields MRSUBG_PacketSettingsStruct =
+			MRSUBG_DEFAULT_LPAWUR_FRAME_CFG()
+	;
+
+	mrsubg_init(&MRSUBG_RadioInitStruct);
+	mrsubg_frame_init(&MRSUBG_PacketSettingsStruct);
 }
 
 /**

@@ -7,7 +7,7 @@
 #include "stm32wl3x_hal.h"
 
 #include <my_lpawur.h>
-#include "main.h"
+#include <assert.h>
 #include "stm32_lpm.h"
 #include "stm32wl3x_ll_usart.h"
 

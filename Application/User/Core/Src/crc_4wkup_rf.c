@@ -106,7 +106,7 @@ void EvaluateCrc(uint8_t * LPAWUR_payload){
   crc_data = crc_seed;
   
   /* loop for CRC computation */
-  for (i=0 ; i <PAYLOAD_LEN ; i++){
+  for (i=0 ; i <LPAWUR_PAYLOAD_LEN ; i++){
     crc_data = crcCalc(crc_data, LPAWUR_payload[i]);
   }
   
@@ -116,8 +116,8 @@ void EvaluateCrc(uint8_t * LPAWUR_payload){
   crc_data2Fifo[0] = (uint8_t) (crc_data >> 8);
   crc_data2Fifo[1] = (uint8_t) (crc_data & 0x00FF);
   
-  *(LPAWUR_payload + PAYLOAD_LEN) = crc_data2Fifo[0];
-  *(LPAWUR_payload + PAYLOAD_LEN +1) = crc_data2Fifo[1]; 
+  *(LPAWUR_payload + LPAWUR_PAYLOAD_LEN) = crc_data2Fifo[0];
+  *(LPAWUR_payload + LPAWUR_PAYLOAD_LEN +1) = crc_data2Fifo[1]; 
 }
 
 

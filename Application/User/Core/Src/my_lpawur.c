@@ -11,67 +11,38 @@
 #include "stm32_lpm.h"
 #include "stm32wl3x_ll_usart.h"
 
-int lpawur_init(SLPAWUR_RFConfig *radio_cfg,
-		SLPAWUR_FrameInit *frame_cfg) {
-
-	/* USER CODE BEGIN LPAWUR_Init 0 */
-
-	/* USER CODE END LPAWUR_Init 0 */
-
-	/* USER CODE BEGIN LPAWUR_Init 1 */
-
-	/* USER CODE END LPAWUR_Init 1 */
-
-	/** Configures the radio parameters
-	 */
-
+void lpawur_init(SLPAWUR_RFConfig *radio_cfg) {
+	assert(radio_cfg != NULL);
 	HAL_LPAWUR_RFConfigInit(radio_cfg);
+}
 
+void lpawur_frame_init(SLPAWUR_FrameInit *frame_cfg) {
+	assert(frame_cfg != NULL);
 	HAL_LPAWUR_FrameInit(frame_cfg);
+}
 
+void lpawur_wake_up_lvl_set(WakeUpLevel lv) {
 	LL_LPAWUR_SetWakeUpLevel(WAKEUP_FRAME_VALID);
+}
+
+void lpawur_enable() {
 	LL_LPAWUR_SetState(ENABLE);
-
-	/* USER CODE BEGIN LPAWUR_Init 2 */
-
-	/* USER CODE END LPAWUR_Init 2 */
 }
 
-void lpawur_recv(uint8_t *data, size_t sz) {
-	/* USER CODE BEGIN MX_APPE_Process_1 */
-
-	/* USER CODE END MX_APPE_Process_1 */
-
-	/* USER CODE BEGIN MX_APPE_Process_2 */
-
-	/* Wakeup source configuration */
-	HAL_PWREx_EnableInternalWakeUpLine(PWR_WAKEUP_LPAWUR, PWR_WUP_RISIEDG);
-	HAL_PWR_EnableWakeUpPin(LL_PWR_WAKEUP_PORTA, PWR_WAKEUP_PIN0,
-	PWR_WUP_FALLEDG);
-
-	uint32_t wakeupSource = HAL_PWREx_GetClearInternalWakeUpLine();
-
-	/* Wakeup on LPAWUR Frame Valid */
-
-	if (wakeupSource & PWR_WAKEUP_LPAWUR) {
-		BSP_LED_On(LD2);
-
-		HAL_LPAWUR_GetPayload(data);
-
-		HAL_LPAWUR_ClearStatus();
-
-		LL_LPAWUR_SetState(ENABLE);
-
-		BSP_LED_Off(LD2);
-	}
-
-	wakeupSource = HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTA);
-	if (wakeupSource & B1_PIN) {
-		printf("GPIO wakeup\r\n");
-		while (4)
-			;
-	}
-
-	/* USER CODE END MX_APPE_Process_2 */
+void lpawur_disable() {
+	LL_LPAWUR_SetState(DISABLE);
 }
 
+LPAWUR_Status lpawur_recv(uint8_t *data, size_t sz) {
+	uint8_t length = LL_LPAWUR_GetPayloadLength();
+	if(sz < length){
+		return NO_STATUS;
+	}
+
+	HAL_LPAWUR_GetPayload(data);
+
+	LPAWUR_Status ret = HAL_LPAWUR_GetStatus();
+	HAL_LPAWUR_ClearStatus();
+
+	return ret;
+}

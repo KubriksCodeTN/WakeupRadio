@@ -206,7 +206,7 @@ static void CreateLPAWURFrame(uint8_t *data) {
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-int main(void) {
+int main_subg_tx(void) {
 	/* USER CODE BEGIN 1 */
 
 	/* USER CODE END 1 */
@@ -269,7 +269,7 @@ int main(void) {
  * @brief  The application entry point.
  * @retval int
  */
-int main_lpawur_rx(void) {
+int main(void) {
 	/* USER CODE BEGIN 1 */
 	/* USER CODE END 1 */
 
@@ -312,15 +312,43 @@ int main_lpawur_rx(void) {
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	while (1) {
+		printf("WAKE UP\r\n");
 
-		lpawur_recv(lpawur_data, PAYLOAD_LEN);
+		/* Wakeup source configuration */
+		HAL_PWREx_EnableInternalWakeUpLine(PWR_WAKEUP_LPAWUR, PWR_WUP_RISIEDG);
+		HAL_PWR_EnableWakeUpPin(LL_PWR_WAKEUP_PORTA, PWR_WAKEUP_PIN0,
+		PWR_WUP_FALLEDG);
 
-		printf("LPAWUR data received: [ ");
-		for (uint8_t i = 0; i < PAYLOAD_LEN; i++) {
-			printf("%x ", lpawur_data[i]);
+		uint32_t wakeupSource = HAL_PWREx_GetClearInternalWakeUpLine();
+
+		/* Wakeup on LPAWUR Frame Valid */
+
+		if (wakeupSource & PWR_WAKEUP_LPAWUR) {
+			lpawur_disable();
+			BSP_LED_On(LD2);
+			LPAWUR_Status status = lpawur_recv(lpawur_data, PAYLOAD_LEN);
+			printf("LPAWUR status: 0x%02x\r\n", status);
+
+			if (status != NO_STATUS) {
+
+				printf("LPAWUR data received: [ ");
+				for (uint8_t i = 0; i < PAYLOAD_LEN; i++) {
+					printf("0x%02x ", lpawur_data[i]);
+				}
+				printf("]\r\n");
+
+			}
+			BSP_LED_Off(LD2);
+			lpawur_enable();
 		}
-		printf(" ]\r\n");
 
+		wakeupSource = HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTA);
+		if (wakeupSource & B1_PIN) {
+			printf("GPIO wakeup for flashing\r\n");
+			while (4)
+				;
+		}
+		lpawur_enable();
 		enter_low_power(POWER_SAVE_LEVEL_DEEPSTOP_TIMER);
 
 		/* USER CODE END WHILE */
@@ -395,33 +423,13 @@ static void MX_LPAWUR_Init(void) {
 	/** Configures the radio parameters
 	 */
 
-	SLPAWUR_RFConfig LPAWUR_RadioInitStruct;
-	SLPAWUR_FrameInit LPAWUR_FrameInitStruct;
+	SLPAWUR_RFConfig LPAWUR_RadioInitStruct = LPAWUR_DEFAULT_CFG()
+	;
+	SLPAWUR_FrameInit LPAWUR_FrameInitStruct = LPAWUR_DEFAULT_FRAME_CFG()
+	;
 
-	LPAWUR_RadioInitStruct.EnergyDetectorIcal = ED_ICAL_VBAT_3_25_TO_3_50;
-	LPAWUR_RadioInitStruct.ClockDivider = 7;
-	LPAWUR_RadioInitStruct.EnergyDetectorSwitch = DISABLE;
-	LPAWUR_RadioInitStruct.AgcResetMode = AGC_RESET_MODE_NEVER;
-	LPAWUR_RadioInitStruct.AgcHoldMode = AGC_HOLD_AFTER_PREAMBLE;
-	LPAWUR_RadioInitStruct.AgcMode = AGC_MODE_OFF;
-	LPAWUR_RadioInitStruct.AgcHiLvl = AGC_VBAT_0800;
-	LPAWUR_RadioInitStruct.DCCurrentSubtraction = ENABLE;
-	LPAWUR_RadioInitStruct.AgcLoLvl = AGC_LOW_0;
-
-	LPAWUR_FrameInitStruct.TRecAlgoSel = TWO_STEPS;
-	LPAWUR_FrameInitStruct.SlowClkCyclePerBitCnt = 16;
-	LPAWUR_FrameInitStruct.PayloadLength = 7;
-	LPAWUR_FrameInitStruct.SyncThr = 16;
-	LPAWUR_FrameInitStruct.SyncLength = 0;
-	LPAWUR_FrameInitStruct.PreambleThrCnt = 0x3C;
-	LPAWUR_FrameInitStruct.PreambleEnable = ENABLE;
-	LPAWUR_FrameInitStruct.FrameSyncCntTimeout = 0x60;
-	LPAWUR_FrameInitStruct.FrameSyncPattenHigh = 0x00;
-	LPAWUR_FrameInitStruct.FrameSyncPatternLow = 38550;
-	LPAWUR_FrameInitStruct.KpGain = 6;
-	LPAWUR_FrameInitStruct.KiGain = 10;
-
-	lpawur_init(&LPAWUR_RadioInitStruct, &LPAWUR_FrameInitStruct);
+	lpawur_init(&LPAWUR_RadioInitStruct);
+	lpawur_frame_init(&LPAWUR_FrameInitStruct);
 
 	/* USER CODE BEGIN LPAWUR_Init 2 */
 

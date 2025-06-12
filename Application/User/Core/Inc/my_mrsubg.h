@@ -66,6 +66,7 @@ void mrsubg_init(SMRSubGConfig *radio_cfg);
 void mrsubg_frame_init(MRSubG_PcktBasicFields *frame_cfg);
 void mrsubg_set_manchester_type(MRSubG_ManchesterPolarity t);
 
-void mrsubg_tx(uint8_t *data, size_t sz);
+void mrsubg_send(uint8_t *data, size_t sz);
+uint32_t mrsubg_recv(uint8_t* data, size_t sz);
 
 #endif /* APPLICATION_USER_CORE_INC_MY_MRSUBG_H_ */

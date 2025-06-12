@@ -38,6 +38,7 @@
 
 #define LPAWUR_PAYLOAD_LEN 7
 #define LPAWUR_FRAME_LEN 15
+#define MRSUBG_PAYLOAD_LEN 4
 
 /* USER CODE END PD */
 
@@ -58,6 +59,8 @@ void PeriphCommonClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_LPAWUR_Init(void);
 static void MX_MRSUBG_Init(void);
+// init mrsubg for talking to lpawur
+static void MX_MRSUBG_Init_LPAWUR(void);
 static void utils_init(void) {
 	COM_InitTypeDef COM_Init = { 0 };
 
@@ -142,12 +145,11 @@ static void CreateLPAWURFrame(uint8_t *data) {
 
 void task_subg_tx(void) {
 
-	MX_MRSUBG_Init();
 	utils_init();
 
 	printf("MRSUBG - TX example.\r\n");
-
 	uint8_t lpawur_frame[LPAWUR_FRAME_LEN] = { 0 };
+	uint8_t mrsubg_payload[MRSUBG_PAYLOAD_LEN] = { 0xC0, 0xFF, 0xEE, 0x00 };
 	CreateLPAWURFrame(lpawur_frame);
 
 	while (1) {
@@ -162,13 +164,24 @@ void task_subg_tx(void) {
 		if (wakeupPin & B2_PIN) {
 			BSP_LED_On(LD2);
 
+			MX_MRSUBG_Init_LPAWUR();
 			printf("Transmitting to LPAWUR: [ ");
 			for (uint8_t i = 0; i < LPAWUR_FRAME_LEN; i++) {
 				printf("0x%02x ", lpawur_frame[i]);
 			}
 			printf("]\r\n");
+			mrsubg_send(lpawur_frame, LPAWUR_FRAME_LEN);
 
-			mrsubg_tx(lpawur_frame, LPAWUR_FRAME_LEN);
+			HAL_Delay(100);
+
+			MX_MRSUBG_Init();
+			printf("Transmitting to MRSUBG: [ ");
+			for (uint8_t i = 0; i < MRSUBG_PAYLOAD_LEN; i++) {
+				printf("0x%02x ", mrsubg_payload[i]);
+			}
+			printf("]\r\n");
+			mrsubg_send(mrsubg_payload, MRSUBG_PAYLOAD_LEN);
+
 			BSP_LED_Off(LD2);
 		}
 
@@ -178,6 +191,7 @@ void task_subg_tx(void) {
 				;
 		}
 
+		++mrsubg_payload[3];
 		enter_low_power(POWER_SAVE_LEVEL_DEEPSTOP_TIMER);
 	}
 }
@@ -185,13 +199,13 @@ void task_subg_tx(void) {
 void task_lpawur_rx(void) {
 
 	MX_LPAWUR_Init();
-	//MX_MRSUBG_Init();
+	MX_MRSUBG_Init();
 	utils_init();
 
 	printf("LPAWUR - Receiver example.\r\n");
 
-	uint8_t lpawur_data[LPAWUR_PAYLOAD_LEN] = { 100, 101, 102, 103, 104, 105,
-			106 };
+	uint8_t lpawur_data[LPAWUR_PAYLOAD_LEN] = { 0 };
+	uint8_t mrsubg_data[MRSUBG_PAYLOAD_LEN] = { 0 };
 
 	while (1) {
 		printf("WAKE UP\r\n");
@@ -220,8 +234,44 @@ void task_lpawur_rx(void) {
 				printf("]\r\n");
 
 			}
+
+			uint32_t mrsubg_status = mrsubg_recv(mrsubg_data,
+					MRSUBG_PAYLOAD_LEN);
+
+			printf("MRSUBG status: 0x%06x\r\n", mrsubg_status);
+
+			if (mrsubg_status & MR_SUBG_GLOB_STATUS_RFSEQ_IRQ_STATUS_RX_OK_F) {
+
+				printf("MRSUBG data received: [ ");
+				for (uint8_t i = 0; i < MRSUBG_PAYLOAD_LEN; i++) {
+					printf("0x%02x ", mrsubg_data[i]);
+				}
+				printf("]\r\n");
+
+				/* Clear the IRQ flag */
+				__HAL_MRSUBG_CLEAR_RFSEQ_IRQ_FLAG(
+						MR_SUBG_GLOB_STATUS_RFSEQ_IRQ_STATUS_RX_OK_F);
+
+			} else if (mrsubg_status
+					& MR_SUBG_GLOB_STATUS_RFSEQ_IRQ_STATUS_RX_CRC_ERROR_F) {
+				printf("CRC Error\r\n");
+
+				/* Clear the IRQ flag */
+				__HAL_MRSUBG_CLEAR_RFSEQ_IRQ_FLAG(
+						MR_SUBG_GLOB_STATUS_RFSEQ_IRQ_STATUS_RX_CRC_ERROR_F);
+
+			} else if (mrsubg_status
+					& MR_SUBG_GLOB_STATUS_RFSEQ_IRQ_STATUS_RX_TIMEOUT_F) {
+				printf("RX Timeout\r\n");
+
+				/* Clear the IRQ flag */
+				__HAL_MRSUBG_CLEAR_RFSEQ_IRQ_FLAG(
+						MR_SUBG_GLOB_STATUS_RFSEQ_IRQ_STATUS_RX_TIMEOUT_F);
+
+			}
+
 			BSP_LED_Off(LD2);
-			lpawur_enable();
+
 		}
 
 		wakeupSource = HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTA);
@@ -267,8 +317,8 @@ int main(void) {
 	/* Initialize all configured peripherals */
 	MX_GPIO_Init();
 
-	// task_lpawur_rx();
-	task_subg_tx();
+	task_lpawur_rx();
+	// task_subg_tx();
 }
 
 /**
@@ -335,12 +385,23 @@ static void MX_LPAWUR_Init(void) {
 
 }
 
-static void MX_MRSUBG_Init(void) {
+static void MX_MRSUBG_Init_LPAWUR(void) {
 
 	SMRSubGConfig MRSUBG_RadioInitStruct = MRSUBG_DEFAULT_LPAWUR_CFG()
 	;
 	MRSubG_PcktBasicFields MRSUBG_PacketSettingsStruct =
 			MRSUBG_DEFAULT_LPAWUR_FRAME_CFG()
+	;
+
+	mrsubg_init(&MRSUBG_RadioInitStruct);
+	mrsubg_frame_init(&MRSUBG_PacketSettingsStruct);
+}
+
+static void MX_MRSUBG_Init(void) {
+	SMRSubGConfig MRSUBG_RadioInitStruct = MRSUBG_DEFAULT_CFG()
+	;
+	MRSubG_PcktBasicFields MRSUBG_PacketSettingsStruct =
+			MRSUBG_DEFAULT_FRAME_CFG()
 	;
 
 	mrsubg_init(&MRSUBG_RadioInitStruct);

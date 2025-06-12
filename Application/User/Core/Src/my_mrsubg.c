@@ -22,7 +22,7 @@ void mrsubg_set_manchester_type(MRSubG_ManchesterPolarity t) {
 	LL_MRSubG_PacketHandlerManchesterType(t);
 }
 
-void mrsubg_tx(uint8_t *data, size_t sz) {
+void mrsubg_send(uint8_t *data, size_t sz) {
 
 	HAL_MRSubG_PktBasicSetPayloadLength(sz);
 
@@ -43,3 +43,39 @@ void mrsubg_tx(uint8_t *data, size_t sz) {
 	__HAL_MRSUBG_CLEAR_RFSEQ_IRQ_FLAG(
 			MR_SUBG_GLOB_STATUS_RFSEQ_IRQ_STATUS_TX_DONE_F);
 }
+
+uint32_t mrsubg_recv(uint8_t* data, size_t sz) {
+
+	/* Payload length config */
+	HAL_MRSubG_PktBasicSetPayloadLength(sz);
+
+	__HAL_MRSUBG_SET_RX_MODE(RX_NORMAL);
+
+	__HAL_MRSUBG_SET_DATABUFFER0_POINTER((uint32_t )data);
+
+	/* Start RX */
+	__HAL_MRSUBG_STROBE_CMD(CMD_RX);
+
+	HAL_Delay(100);
+
+	uint32_t irq = __HAL_MRSUBG_GET_RFSEQ_IRQ_STATUS();
+
+	if (irq & MR_SUBG_GLOB_STATUS_RFSEQ_IRQ_STATUS_RX_OK_F) {
+		/* Clear the IRQ flag */
+		__HAL_MRSUBG_CLEAR_RFSEQ_IRQ_FLAG(
+				MR_SUBG_GLOB_STATUS_RFSEQ_IRQ_STATUS_RX_OK_F);
+
+		/* Restart RX */
+		//__HAL_MRSUBG_STROBE_CMD(CMD_RX);
+	} else if (irq & MR_SUBG_GLOB_STATUS_RFSEQ_IRQ_STATUS_RX_CRC_ERROR_F) {
+
+		/* Clear the IRQ flag */
+		__HAL_MRSUBG_CLEAR_RFSEQ_IRQ_FLAG(
+				MR_SUBG_GLOB_STATUS_RFSEQ_IRQ_STATUS_RX_CRC_ERROR_F);
+
+		/* Restart RX */
+		// __HAL_MRSUBG_STROBE_CMD(CMD_RX);
+	}
+		return irq;
+}
+

@@ -6,7 +6,7 @@
  */
 #include "stm32wl3x_hal.h"
 
-#include <my_lpawur.h>
+#include "my_lpawur.h"
 #include <assert.h>
 #include "stm32_lpm.h"
 #include "stm32wl3x_ll_usart.h"
@@ -22,7 +22,7 @@ void lpawur_frame_init(SLPAWUR_FrameInit *frame_cfg) {
 }
 
 void lpawur_wake_up_lvl_set(WakeUpLevel lv) {
-	LL_LPAWUR_SetWakeUpLevel(WAKEUP_FRAME_VALID);
+	LL_LPAWUR_SetWakeUpLevel(lv);
 }
 
 void lpawur_enable() {
@@ -34,6 +34,8 @@ void lpawur_disable() {
 }
 
 LPAWUR_Status lpawur_recv(uint8_t *data, size_t sz) {
+	assert(sz < LPAWUR_PAYLOAD_LEN_MAX);
+
 	uint8_t length = LL_LPAWUR_GetPayloadLength();
 	if(sz < length){
 		return NO_STATUS;

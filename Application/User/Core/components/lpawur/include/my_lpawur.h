@@ -9,8 +9,12 @@
 #define APPLICATION_USER_CORE_INC_LPAWUR_H_
 
 #include "stm32wl3x_ll_lpawur.h"
+#include "crc_4wkup_rf.h"
 
 #include <stdlib.h>
+
+#define LPAWUR_PAYLOAD_LEN_MAX 8
+#define LPAWUR_FRAME_LEN_MAX 17
 
 #define LPAWUR_DEFAULT_CFG() (SLPAWUR_RFConfig){ \
 	.EnergyDetectorIcal = ED_ICAL_VBAT_3_25_TO_3_50, \
@@ -34,7 +38,7 @@
 	.PreambleEnable = ENABLE, \
 	.FrameSyncCntTimeout = 0x60, \
 	.FrameSyncPattenHigh = 0x00, \
-	.FrameSyncPatternLow = 38550, \
+	.FrameSyncPatternLow = 0x9696, \
 	.KpGain = 6, \
 	.KiGain = 10, \
 };

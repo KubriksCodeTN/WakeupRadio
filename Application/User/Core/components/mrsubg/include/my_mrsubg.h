@@ -10,6 +10,8 @@
 
 #include "stm32wl3x_hal_mrsubg.h"
 
+#define MRSUBG_PAYLOAD_LEN 4
+
 #define MRSUBG_DEFAULT_CFG() (SMRSubGConfig){ \
 	.lFrequencyBase = 868000000, \
 	.xModulationSelect = MOD_2FSK, \
@@ -36,7 +38,7 @@
 	.SyncPresent = ENABLE, \
 };
 
-#define MRSUBG_DEFAULT_LPAWUR_CFG() (SMRSubGConfig){ \
+#define MRSUBG_DEFAULT_WAKEUP_CFG() (SMRSubGConfig){ \
 	MRSUBG_RadioInitStruct.lFrequencyBase = 868000000, \
 	MRSUBG_RadioInitStruct.xModulationSelect = MOD_OOK, \
 	MRSUBG_RadioInitStruct.lDatarate = 2000, \
@@ -47,7 +49,7 @@
 	MRSUBG_RadioInitStruct.PADrvMode = PA_DRV_TX_HP, \
 };
 
-#define MRSUBG_DEFAULT_LPAWUR_FRAME_CFG() (MRSubG_PcktBasicFields){ \
+#define MRSUBG_DEFAULT_WAKEUP_FRAME_CFG() (MRSubG_PcktBasicFields){ \
 	MRSUBG_PacketSettingsStruct.PreambleLength = 0, \
 	MRSUBG_PacketSettingsStruct.PostambleLength = 0, \
 	MRSUBG_PacketSettingsStruct.SyncLength = 0, \

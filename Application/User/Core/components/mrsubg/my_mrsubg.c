@@ -15,6 +15,7 @@ void mrsubg_init(SMRSubGConfig *radio_cfg) {
 
 void mrsubg_frame_init(MRSubG_PcktBasicFields *frame_cfg) {
 	assert(frame_cfg != NULL);
+
 	HAL_MRSubG_PacketBasicInit(frame_cfg);
 }
 

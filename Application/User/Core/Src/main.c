@@ -25,7 +25,6 @@
 #include "my_lpawur.h"
 #include "my_mrsubg.h"
 #include "stm32_lpm.h"
-#include "crc_4wkup_rf.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -38,7 +37,6 @@
 
 #define LPAWUR_PAYLOAD_LEN 7
 #define LPAWUR_FRAME_LEN 15
-#define MRSUBG_PAYLOAD_LEN 4
 
 /* USER CODE END PD */
 
@@ -50,6 +48,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+
+static uint8_t lpawur_frame[LPAWUR_FRAME_LEN];
 
 /* USER CODE END PV */
 
@@ -115,27 +115,6 @@ void enter_low_power(PowerSaveLevels lv) {
 #endif /* CFG_LPM_SUPPORTED */
 }
 
-static void CreateLPAWURFrame(uint8_t *data) {
-
-	/* bit sync */
-	for (int i = 0; i < 5; i++)
-		data[i] = 0x00;
-
-	/* Frame sync */
-	data[5] = 0x99;
-
-	/* Payload */
-	data[6] = 0x07;
-	data[7] = 0x06;
-	data[8] = 0x05;
-	data[9] = 0x04;
-	data[10] = 0x03;
-	data[11] = 0x02;
-	data[12] = 0x01;
-
-	/* CRC */
-	EvaluateCrc(&data[6]);
-}
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -143,14 +122,32 @@ static void CreateLPAWURFrame(uint8_t *data) {
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+static void wakeup_frame_create(const uint8_t *data) {
+
+	/* bit sync */
+	memset(&lpawur_frame[0], 0, 5);
+
+	/* Frame sync */
+	lpawur_frame[5] = 0x99;
+
+	/* Payload */
+	memcpy(&lpawur_frame[6], data, LPAWUR_PAYLOAD_LEN);
+
+	/* CRC */
+	uint16_t crc = EvaluateCrc(data);
+	lpawur_frame[6 + LPAWUR_PAYLOAD_LEN] = crc >> 8;
+	lpawur_frame[6 + LPAWUR_PAYLOAD_LEN + 1] = crc & 0xFF;
+}
+
 void task_subg_tx(void) {
 
 	utils_init();
 
+	uint8_t lpawur_data[LPAWUR_PAYLOAD_LEN] = {7, 6, 5, 4, 3, 2, 1};
+	wakeup_frame_create(lpawur_data);
+
 	printf("MRSUBG - TX example.\r\n");
-	uint8_t lpawur_frame[LPAWUR_FRAME_LEN] = { 0 };
 	uint8_t mrsubg_payload[MRSUBG_PAYLOAD_LEN] = { 0xC0, 0xFF, 0xEE, 0x00 };
-	CreateLPAWURFrame(lpawur_frame);
 
 	while (1) {
 
@@ -318,7 +315,7 @@ int main(void) {
 	MX_GPIO_Init();
 
 	task_lpawur_rx();
-	// task_subg_tx();
+	//task_subg_tx();
 }
 
 /**
@@ -382,15 +379,16 @@ static void MX_LPAWUR_Init(void) {
 
 	lpawur_init(&LPAWUR_RadioInitStruct);
 	lpawur_frame_init(&LPAWUR_FrameInitStruct);
+	lpawur_wake_up_lvl_set(WAKEUP_FRAME_VALID);
 
 }
 
 static void MX_MRSUBG_Init_LPAWUR(void) {
 
-	SMRSubGConfig MRSUBG_RadioInitStruct = MRSUBG_DEFAULT_LPAWUR_CFG()
+	SMRSubGConfig MRSUBG_RadioInitStruct = MRSUBG_DEFAULT_WAKEUP_CFG()
 	;
 	MRSubG_PcktBasicFields MRSUBG_PacketSettingsStruct =
-			MRSUBG_DEFAULT_LPAWUR_FRAME_CFG()
+			MRSUBG_DEFAULT_WAKEUP_FRAME_CFG()
 	;
 
 	mrsubg_init(&MRSUBG_RadioInitStruct);

@@ -95,7 +95,7 @@ uint16_t crcCalc(uint16_t crcReg, uint8_t crcData)
   return crcReg;
 }
 
-void EvaluateCrc(uint8_t * LPAWUR_payload){
+uint16_t EvaluateCrc(const uint8_t * LPAWUR_payload){
   uint16_t crc_seed = 0;
   uint16_t crc_data = 0;
   uint8_t crc_data2Fifo[2];
@@ -111,13 +111,13 @@ void EvaluateCrc(uint8_t * LPAWUR_payload){
   }
   
   /* reflect result of 16-bit CRC */
-  crc_data = Reflected16(crc_data);  
-  
+  return Reflected16(crc_data);
+  /*
   crc_data2Fifo[0] = (uint8_t) (crc_data >> 8);
   crc_data2Fifo[1] = (uint8_t) (crc_data & 0x00FF);
-  
-  *(LPAWUR_payload + LPAWUR_PAYLOAD_LEN) = crc_data2Fifo[0];
-  *(LPAWUR_payload + LPAWUR_PAYLOAD_LEN +1) = crc_data2Fifo[1]; 
+
+  return ((uint16_t)crc_data2Fifo[0] << 8) | crc_data2Fifo[1];
+  */
 }
 
 

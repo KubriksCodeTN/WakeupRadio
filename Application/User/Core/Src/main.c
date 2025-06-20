@@ -22,6 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdbool.h>
 #include "my_lpawur.h"
 #include "my_mrsubg.h"
 #include "stm32_lpm.h"
@@ -49,15 +50,13 @@
 
 /* USER CODE BEGIN PV */
 
-static uint8_t lpawur_frame[LPAWUR_FRAME_LEN];
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 void PeriphCommonClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_LPAWUR_Init(void);
+static void MX_LPAWUR_Init(uint8_t fs_high, uint8_t fs_low, bool fs_16bit);
 static void MX_MRSUBG_Init(void);
 // init mrsubg for talking to lpawur
 static void MX_MRSUBG_Init_LPAWUR(void);
@@ -76,6 +75,7 @@ static void utils_init(void) {
 
 	BSP_PB_Init(B1, GPIO_MODE);
 	BSP_PB_Init(B2, GPIO_MODE);
+	//BSP_PB_Init(B3, GPIO_MODE);
 
 	/* Low Power Manager Init */
 	UTIL_LPM_Init();
@@ -117,64 +117,107 @@ void enter_low_power(PowerSaveLevels lv) {
 
 /* USER CODE BEGIN PFP */
 
+const uint8_t fs_high = 0x11;
+const uint8_t fs_low = 0x55;
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-static void wakeup_frame_create(const uint8_t *data) {
+static uint16_t manchester_encode(uint8_t in) {
+	uint16_t ret = 0;
+	for (int i = 0; i < 8 * sizeof(in); ++i) {
+		if ((in >> i) & 0x1) {
+			ret |= (1 << (2 * i + 1));
+		} else {
+			ret |= (1 << (2 * i));
+		}
+	}
+
+	return ret;
+}
+
+static void wakeup_frame_create(uint8_t *lpawur_frame, uint8_t fs_high,
+		uint8_t fs_low, bool fs_16bit, const uint8_t *data, size_t sz) {
 
 	/* bit sync */
 	memset(&lpawur_frame[0], 0, 5);
 
+	uint8_t idx = 5;
+
 	/* Frame sync */
-	lpawur_frame[5] = 0x99;
+	if (fs_16bit) {
+		lpawur_frame[idx++] = fs_high;
+		lpawur_frame[idx++] = fs_low;
+	} else {
+		lpawur_frame[idx++] = fs_low;
+	}
 
 	/* Payload */
-	memcpy(&lpawur_frame[6], data, LPAWUR_PAYLOAD_LEN);
+	memcpy(&lpawur_frame[idx], data, sz);
+	idx += sz;
 
 	/* CRC */
 	uint16_t crc = EvaluateCrc(data);
-	lpawur_frame[6 + LPAWUR_PAYLOAD_LEN] = crc >> 8;
-	lpawur_frame[6 + LPAWUR_PAYLOAD_LEN + 1] = crc & 0xFF;
+	lpawur_frame[idx++] = crc >> 8;
+	lpawur_frame[idx++] = crc & 0xFF;
 }
 
 void task_subg_tx(void) {
 
-	utils_init();
+	uint8_t lpawur_frame[LPAWUR_FRAME_LEN_MAX];
+	size_t lpawur_frame_len = 0;
 
-	uint8_t lpawur_data[LPAWUR_PAYLOAD_LEN] = {7, 6, 5, 4, 3, 2, 1};
-	wakeup_frame_create(lpawur_data);
+	uint8_t lpawur_data[LPAWUR_PAYLOAD_LEN] = { 7, 6, 5, 4, 3, 2, 1 };
 
 	printf("MRSUBG - TX example.\r\n");
-	uint8_t mrsubg_payload[MRSUBG_PAYLOAD_LEN] = { 0xC0, 0xFF, 0xEE, 0x00 };
+	uint8_t mrsubg_payload[MRSUBG_PAYLOAD_LEN] = { 0xc0, 0xFF, 0xEE, 0x00 };
 
 	while (1) {
 
-		HAL_PWR_EnableWakeUpPin(LL_PWR_WAKEUP_PORTA, PWR_WAKEUP_PIN11,
+		HAL_PWR_EnableWakeUpPin(LL_PWR_WAKEUP_PORTA,
+		PWR_WAKEUP_PIN11 | PWR_WAKEUP_PIN0,
 		PWR_WUP_FALLEDG);
-		HAL_PWR_EnableWakeUpPin(LL_PWR_WAKEUP_PORTA, PWR_WAKEUP_PIN0,
+		HAL_PWR_EnableWakeUpPin(LL_PWR_WAKEUP_PORTB, PWR_WAKEUP_PIN15,
 		PWR_WUP_FALLEDG);
 
-		uint32_t wakeupPin = HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTA);
+		uint32_t wakeupPin = HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTA)
+				| HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTB);
 
-		if (wakeupPin & B2_PIN) {
+		if (wakeupPin & (B2_PIN | GPIO_PIN_15)) {
+
+			printf("------------\r\n");
+
 			BSP_LED_On(LD2);
 
 			MX_MRSUBG_Init_LPAWUR();
+
+			if (wakeupPin & GPIO_PIN_15) {
+				wakeup_frame_create(lpawur_frame, fs_high, fs_low, false,
+						lpawur_data,
+						LPAWUR_PAYLOAD_LEN);
+				lpawur_frame_len = LPAWUR_FRAME_LEN;
+			} else {
+				wakeup_frame_create(lpawur_frame, fs_high, fs_low, true,
+						lpawur_data,
+						LPAWUR_PAYLOAD_LEN);
+				lpawur_frame_len = LPAWUR_FRAME_LEN + 1;
+			}
+
 			printf("Transmitting to LPAWUR: [ ");
-			for (uint8_t i = 0; i < LPAWUR_FRAME_LEN; i++) {
-				printf("0x%02x ", lpawur_frame[i]);
+			for (uint8_t i = 0; i < lpawur_frame_len; i++) {
+				printf("0x%02X ", lpawur_frame[i]);
 			}
 			printf("]\r\n");
-			mrsubg_send(lpawur_frame, LPAWUR_FRAME_LEN);
+			mrsubg_send(lpawur_frame, lpawur_frame_len);
 
 			HAL_Delay(100);
 
 			MX_MRSUBG_Init();
 			printf("Transmitting to MRSUBG: [ ");
 			for (uint8_t i = 0; i < MRSUBG_PAYLOAD_LEN; i++) {
-				printf("0x%02x ", mrsubg_payload[i]);
+				printf("0x%02X ", mrsubg_payload[i]);
 			}
 			printf("]\r\n");
 			mrsubg_send(mrsubg_payload, MRSUBG_PAYLOAD_LEN);
@@ -195,9 +238,8 @@ void task_subg_tx(void) {
 
 void task_lpawur_rx(void) {
 
-	MX_LPAWUR_Init();
+	MX_LPAWUR_Init(fs_high, fs_low, true);
 	MX_MRSUBG_Init();
-	utils_init();
 
 	printf("LPAWUR - Receiver example.\r\n");
 
@@ -217,6 +259,9 @@ void task_lpawur_rx(void) {
 		/* Wakeup on LPAWUR Frame Valid */
 
 		if (wakeupSource & PWR_WAKEUP_LPAWUR) {
+
+			printf("------------\r\n");
+
 			lpawur_disable();
 			BSP_LED_On(LD2);
 			LPAWUR_Status status = lpawur_recv(lpawur_data, LPAWUR_PAYLOAD_LEN);
@@ -226,14 +271,14 @@ void task_lpawur_rx(void) {
 
 				printf("LPAWUR data received: [ ");
 				for (uint8_t i = 0; i < LPAWUR_PAYLOAD_LEN; i++) {
-					printf("0x%02x ", lpawur_data[i]);
+					printf("0x%02X ", lpawur_data[i]);
 				}
 				printf("]\r\n");
 
 			}
 
 			uint32_t mrsubg_status = mrsubg_recv(mrsubg_data,
-					MRSUBG_PAYLOAD_LEN);
+			MRSUBG_PAYLOAD_LEN);
 
 			printf("MRSUBG status: 0x%06x\r\n", mrsubg_status);
 
@@ -241,7 +286,7 @@ void task_lpawur_rx(void) {
 
 				printf("MRSUBG data received: [ ");
 				for (uint8_t i = 0; i < MRSUBG_PAYLOAD_LEN; i++) {
-					printf("0x%02x ", mrsubg_data[i]);
+					printf("0x%02X ", mrsubg_data[i]);
 				}
 				printf("]\r\n");
 
@@ -268,7 +313,6 @@ void task_lpawur_rx(void) {
 			}
 
 			BSP_LED_Off(LD2);
-
 		}
 
 		wakeupSource = HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTA);
@@ -313,6 +357,8 @@ int main(void) {
 
 	/* Initialize all configured peripherals */
 	MX_GPIO_Init();
+
+	utils_init();
 
 	task_lpawur_rx();
 	//task_subg_tx();
@@ -370,12 +416,18 @@ void PeriphCommonClock_Config(void) {
  * @param None
  * @retval None
  */
-static void MX_LPAWUR_Init(void) {
+static void MX_LPAWUR_Init(uint8_t fs_high, uint8_t fs_low, bool fs_16bit) {
 
-	SLPAWUR_RFConfig LPAWUR_RadioInitStruct = LPAWUR_DEFAULT_CFG()
-	;
-	SLPAWUR_FrameInit LPAWUR_FrameInitStruct = LPAWUR_DEFAULT_FRAME_CFG()
-	;
+	SLPAWUR_RFConfig LPAWUR_RadioInitStruct = LPAWUR_DEFAULT_CFG();
+	SLPAWUR_FrameInit LPAWUR_FrameInitStruct = LPAWUR_DEFAULT_FRAME_CFG();
+
+	LPAWUR_FrameInitStruct.FrameSyncPatternLow = manchester_encode(fs_low);
+	LPAWUR_FrameInitStruct.SyncLength = fs_16bit;
+
+	if (fs_16bit) {
+		LPAWUR_FrameInitStruct.FrameSyncPattenHigh = manchester_encode(fs_high);
+		LPAWUR_FrameInitStruct.SyncThr = 32;
+	}
 
 	lpawur_init(&LPAWUR_RadioInitStruct);
 	lpawur_frame_init(&LPAWUR_FrameInitStruct);
@@ -418,6 +470,20 @@ static void MX_GPIO_Init(void) {
 	/* GPIO Ports Clock Enable */
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 	__HAL_RCC_GPIOB_CLK_ENABLE();
+
+	GPIO_InitTypeDef GPIO_Init;
+
+	GPIO_Init.Pin = GPIO_PIN_15;
+	GPIO_Init.Pull = GPIO_PULLUP;
+	GPIO_Init.Speed = GPIO_SPEED_FREQ_HIGH;
+	GPIO_Init.Mode = GPIO_MODE_INPUT;
+
+	HAL_GPIO_Init(GPIOB, &GPIO_Init);
+
+	if (LL_PWR_IsEnabledPUPDCfg() != 0) {
+
+		LL_PWR_EnableGPIOPullUp( LL_PWR_GPIO_B, GPIO_Init.Pin);
+	}
 
 	/* USER CODE BEGIN MX_GPIO_Init_2 */
 	/* USER CODE END MX_GPIO_Init_2 */

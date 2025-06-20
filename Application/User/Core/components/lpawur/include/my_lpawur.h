@@ -26,7 +26,7 @@
 	.AgcHiLvl = AGC_VBAT_0800, \
 	.DCCurrentSubtraction = ENABLE, \
 	.AgcLoLvl = AGC_LOW_0, \
-};
+}
 
 #define LPAWUR_DEFAULT_FRAME_CFG() (SLPAWUR_FrameInit){ \
 	.TRecAlgoSel = TWO_STEPS, \
@@ -34,14 +34,14 @@
 	.PayloadLength = 7, \
 	.SyncThr = 16, \
 	.SyncLength = 0, \
-	.PreambleThrCnt = 0x3C, \
+	.PreambleThrCnt = 70, \
 	.PreambleEnable = ENABLE, \
 	.FrameSyncCntTimeout = 0x60, \
 	.FrameSyncPattenHigh = 0x00, \
 	.FrameSyncPatternLow = 0x9696, \
 	.KpGain = 6, \
 	.KiGain = 10, \
-};
+}
 
 void lpawur_init(SLPAWUR_RFConfig* radio_cfg);
 void lpawur_frame_init(SLPAWUR_FrameInit* frame_cfg);

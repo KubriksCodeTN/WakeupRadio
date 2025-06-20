@@ -234,6 +234,7 @@ void PWR_EnterStopMode( void )
   }
   clockContext.clkDiv = LL_RCC_GetCLKSYSPrescalerStatus();
 
+
   /* Setup the wakeup sources */
   HAL_PWREx_EnableInternalWakeUpLine(PWR_WAKEUP_LPAWUR|PWR_WAKEUP_SUBG|PWR_WAKEUP_SUBGHOST, 0);
 

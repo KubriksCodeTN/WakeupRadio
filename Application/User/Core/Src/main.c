@@ -604,7 +604,13 @@ static void MX_MRSUBG_Init_LPAWUR(void) {
 			MRSUBG_DEFAULT_WAKEUP_FRAME_CFG();
 
 	//MRSUBG_RadioInitStruct.outputPower = 20;
-	//MRSUBG_RadioInitStruct.PADrvMode = PA_DRV_TX_TX_HP;
+
+	if(MRSUBG_RadioInitStruct.outputPower <= 10)
+		MRSUBG_RadioInitStruct.PADrvMode = PA_DRV_TX;
+	else if(MRSUBG_RadioInitStruct.outputPower <= 14)
+		MRSUBG_RadioInitStruct.PADrvMode = PA_DRV_TX_HP;
+	else
+		MRSUBG_RadioInitStruct.PADrvMode = PA_DRV_TX_TX_HP;
 
 	mrsubg_init(&MRSUBG_RadioInitStruct);
 	mrsubg_frame_init(&MRSUBG_PacketSettingsStruct);

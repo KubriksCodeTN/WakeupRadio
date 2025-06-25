@@ -72,6 +72,7 @@ static void utils_init(void) {
 	/* USER CODE END APPE_Init_1 */
 
 	BSP_LED_Init(LD2);
+	BSP_LED_Init(LD3);
 
 	BSP_PB_Init(B1, GPIO_MODE);
 	BSP_PB_Init(B2, GPIO_MODE);
@@ -166,6 +167,9 @@ static void wakeup_frame_create(uint8_t *lpawur_frame, uint8_t fs_high,
 
 /*
  * tx to wakeup n times
+ * B1 for falsh
+ * B2 for sending msgs with 8bit frame_sync
+ * B3 for sending msgs with 16bit frame_sync
  */
 void task_wakeup_tx(int n) {
 	uint8_t lpawur_frame[LPAWUR_FRAME_LEN_MAX];
@@ -194,7 +198,7 @@ void task_wakeup_tx(int n) {
 
 			MX_MRSUBG_Init_LPAWUR();
 
-			if (wakeupPin & GPIO_PIN_15) {
+			if (wakeupPin & B2_PIN) {
 				wakeup_frame_create(lpawur_frame, fs_high, fs_low, false,
 						lpawur_data,
 						LPAWUR_PAYLOAD_LEN);
@@ -262,7 +266,7 @@ void task_wakeup_tx_subg_tx(void) {
 
 			MX_MRSUBG_Init_LPAWUR();
 
-			if (wakeupPin & GPIO_PIN_15) {
+			if (wakeupPin & B2_PIN) {
 				wakeup_frame_create(lpawur_frame, fs_high, fs_low, false,
 						lpawur_data,
 						LPAWUR_PAYLOAD_LEN);
@@ -307,12 +311,17 @@ void task_wakeup_tx_subg_tx(void) {
 
 /*
  * rx for wakeup
+ * B1 for falsh
+ * B2 for changing 8/16 bit framesync (red LED means 16 bit)
+ * B3 for printing number of received msgs *
  */
 void task_lpawur_rx(void) {
 
+	bool sync_16bit = false;
+
 	int recv_pkt_n = 0;
 
-	MX_LPAWUR_Init(fs_high, fs_low, false);
+	MX_LPAWUR_Init(fs_high, fs_low, sync_16bit);
 
 	printf("RX example wakeup.\r\n");
 
@@ -321,10 +330,11 @@ void task_lpawur_rx(void) {
 	while (1) {
 		/* Wakeup source configuration */
 		HAL_PWREx_EnableInternalWakeUpLine(PWR_WAKEUP_LPAWUR, PWR_WUP_RISIEDG);
-		HAL_PWR_EnableWakeUpPin(LL_PWR_WAKEUP_PORTA, PWR_WAKEUP_PIN0,
+		HAL_PWR_EnableWakeUpPin(LL_PWR_WAKEUP_PORTA,
+		PWR_WAKEUP_PIN0 | PWR_WAKEUP_PIN11,
 		PWR_WUP_FALLEDG);
 		HAL_PWR_EnableWakeUpPin(LL_PWR_WAKEUP_PORTB, PWR_WAKEUP_PIN15,
-			PWR_WUP_FALLEDG);
+		PWR_WUP_FALLEDG);
 
 		uint32_t wakeupSource = HAL_PWREx_GetClearInternalWakeUpLine();
 
@@ -353,15 +363,27 @@ void task_lpawur_rx(void) {
 			BSP_LED_Off(LD2);
 		}
 
-		wakeupSource = HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTA) | HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTB);;
+		wakeupSource = HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTA)
+				| HAL_PWR_GetClearWakeupSource(LL_PWR_WAKEUP_PORTB);
+		;
 		if (wakeupSource & B1_PIN) {
 			printf("GPIO wakeup for flashing\r\n");
 			while (4)
 				;
-		}
-		else if(wakeupSource & GPIO_PIN_15){
+		} else if (wakeupSource & GPIO_PIN_15) {
 			printf("recv_pkt_n: %i\r\n", recv_pkt_n);
+		} else if (wakeupSource & B2_PIN) {
+			sync_16bit = !sync_16bit;
+			MX_LPAWUR_Init(fs_high, fs_low, sync_16bit);
+			printf("Changed sync length to %s bit\r\n",
+					sync_16bit ? "16" : "8");
+			if (sync_16bit) {
+				BSP_LED_On(LD3);
+			} else {
+				BSP_LED_Off(LD3);
+			}
 		}
+
 		lpawur_enable();
 
 		enter_low_power(POWER_SAVE_LEVEL_DEEPSTOP_TIMER);
@@ -500,8 +522,8 @@ int main(void) {
 	//task_wakeup_tx_subg_tx();
 
 	// distance test
-	task_wakeup_tx(100);
-	//task_lpawur_rx();
+	//task_wakeup_tx(100);
+	task_lpawur_rx();
 }
 
 /**

@@ -45,14 +45,14 @@ void mrsubg_send(uint8_t *data, size_t sz) {
 			MR_SUBG_GLOB_STATUS_RFSEQ_IRQ_STATUS_TX_DONE_F);
 }
 
-uint32_t mrsubg_recv(uint8_t* data, size_t sz) {
+uint32_t mrsubg_recv(uint8_t *data, size_t sz) {
 
 	/* Payload length config */
 	HAL_MRSubG_PktBasicSetPayloadLength(sz);
 
 	__HAL_MRSUBG_SET_RX_MODE(RX_NORMAL);
 
-	__HAL_MRSUBG_SET_DATABUFFER0_POINTER((uint32_t )data);
+	__HAL_MRSUBG_SET_DATABUFFER0_POINTER((uint32_t ) data);
 
 	/* Start RX */
 	__HAL_MRSUBG_STROBE_CMD(CMD_RX);
@@ -77,6 +77,6 @@ uint32_t mrsubg_recv(uint8_t* data, size_t sz) {
 		/* Restart RX */
 		// __HAL_MRSUBG_STROBE_CMD(CMD_RX);
 	}
-		return irq;
+	return irq;
 }
 
